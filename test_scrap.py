@@ -1,5 +1,5 @@
 import unittest
-from scrap import normalize_url, get_heading_from_html, get_first_paragraph_from_html, get_urls_from_html, get_images_from_html
+from scrap import normalize_url, get_heading_from_html, get_first_paragraph_from_html, get_urls_from_html, get_images_from_html, extract_page_data
 
 class TestScrap(unittest.TestCase):
 
@@ -184,6 +184,68 @@ class TestGetImagesFromHTML(unittest.TestCase):
         actual = get_images_from_html(input_body, input_url)
 
         expected = ["https://crawler-test.com/logo.png"]
+        self.assertEqual(actual, expected)
+
+class TestGetPageData(unittest.TestCase):
+    def test_extract_page_data_basic(self):
+        input_url = "https://crawler-test.com"
+        input_body = """<html><body>
+            <h1>Test Title</h1>
+            <p>This is the first paragraph.</p>
+            <a href="/link1">Link 1</a>
+            <img src="/image1.jpg" alt="Image 1">
+        </body></html>"""
+
+        actual = extract_page_data(input_body, input_url)
+
+        expected = {
+            "url": "https://crawler-test.com",
+            "heading": "Test Title",
+            "first_paragraph": "This is the first paragraph.",
+            "outgoing_links": ["https://crawler-test.com/link1"],
+            "image_urls": ["https://crawler-test.com/image1.jpg"],
+        }
+
+        self.assertEqual(actual, expected)
+
+
+    def test_extract_page_data_h2_fallback(self):
+        input_url = "https://crawler-test.com"
+        input_body = """<html><body>
+            <h2>Fallback Heading</h2>
+            <p>First paragraph.</p>
+            <a href="/about">About</a>
+        </body></html>"""
+
+        actual = extract_page_data(input_body, input_url)
+
+        expected = {
+            "url": "https://crawler-test.com",
+            "heading": "Fallback Heading",
+            "first_paragraph": "First paragraph.",
+            "outgoing_links": ["https://crawler-test.com/about"],
+            "image_urls": [],
+        }
+
+        self.assertEqual(actual, expected)
+
+
+    def test_extract_page_data_empty_content(self):
+        input_url = "https://crawler-test.com"
+        input_body = """<html><body>
+            <div>No useful content here.</div>
+        </body></html>"""
+
+        actual = extract_page_data(input_body, input_url)
+
+        expected = {
+            "url": "https://crawler-test.com",
+            "heading": "",
+            "first_paragraph": "",
+            "outgoing_links": [],
+            "image_urls": [],
+        }
+
         self.assertEqual(actual, expected)
 
 if __name__ == "__main__":
