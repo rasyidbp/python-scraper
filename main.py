@@ -1,4 +1,7 @@
-import sys, requests
+import sys
+
+from crawl import crawl_page
+
 
 def main():
     if len(sys.argv) < 2:
@@ -12,22 +15,12 @@ def main():
     base_url = sys.argv[1]
     print(f"starting crawl of: {base_url}")
 
-    html = get_html(base_url)
-    print(html)
+    page_data = crawl_page(base_url)
 
-def get_html(url):
-    response = requests.get(
-        url,
-        headers={"User-Agent": "BootCrawler/1.0"},
-    )
+    print(f"found {len(page_data)} pages")
 
-    response.raise_for_status()
-
-    content_type = response.headers.get("Content-Type", "")
-    if "text/html" not in content_type:
-        raise Exception("response content type is not text/html")
-
-    return response.text
+    for data in page_data.values():
+        print(data)
 
 
 if __name__ == "__main__":

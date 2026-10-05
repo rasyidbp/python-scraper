@@ -1,6 +1,7 @@
-from urllib.parse import urlsplit, urljoin
+from urllib.parse import urlsplit, urljoin, urlparse
 from bs4 import BeautifulSoup, Tag
 from typing import TypedDict
+import requests
 
 def normalize_url(url):
     parsed = urlsplit(url)
@@ -71,3 +72,47 @@ def extract_page_data(html: str, page_url: str) -> PageData:
         "outgoing_links": get_urls_from_html(html, page_url),
         "image_urls": get_images_from_html(html, page_url),
     }
+
+def get_html(url):
+    response = requests.get(
+        url,
+        headers={"User-Agent": "BootCrawler/1.0"},
+    )
+
+    response.raise_for_status()
+
+    content_type = response.headers.get("Content-Type", "")
+    if "text/html" not in content_type:
+        raise Exception("response content type is not text/html")
+
+    return response.text
+
+def crawl_page(base_url, current_url=None, page_data=None):
+    if current_url is None:
+        current_url = base_url
+
+    if page_data is None:
+        page_data = {}
+
+    if urlparse(base_url).netloc != urlparse(current_url).netloc:
+        return page_data
+
+    normalized_url = normalize_url(current_url)
+
+    if normalized_url in page_data:
+        return page_data
+
+    try:
+        print(f"crawling: {current_url}")
+        html = get_html(current_url)
+    except Exception as e:
+        print(f"error crawling {current_url}: {e}")
+        return page_data
+
+    data = extract_page_data(html, current_url)
+    page_data[normalized_url] = data
+
+    for next_url in data["outgoing_links"]:
+        crawl_page(base_url, next_url, page_data)
+
+    return page_data
