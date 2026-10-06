@@ -74,13 +74,16 @@ def extract_page_data(html: str, page_url: str) -> PageData:
     }
 
 class AsyncCrawler:
-    def __init__(self, base_url, max_concurrency=1):
+    def __init__(self, base_url, max_concurrency=1, max_pages=100):
         self.base_url = base_url
         self.base_domain = urlparse(base_url).netloc
         self.page_data = {}
         self.visited = set()
         self.lock = asyncio.Lock()
         self.max_concurrency = max_concurrency
+        self.max_pages = max_pages
+        self.should_stop = False
+        self.all_tasks = set()
         self.semaphore = asyncio.Semaphore(max_concurrency)
         self.session = None
 
@@ -93,7 +96,15 @@ class AsyncCrawler:
 
     async def add_page_visit(self, normalized_url):
         async with self.lock:
+            if self.should_stop:
+                return False
+
             if normalized_url in self.visited:
+                return False
+
+            if len(self.visited) >= self.max_pages:
+                self.should_stop = True
+                print("Reached maximum number of pages to crawl.")
                 return False
 
             self.visited.add(normalized_url)
@@ -114,6 +125,9 @@ class AsyncCrawler:
             return await response.text()
 
     async def crawl_page(self, current_url):
+        if self.should_stop:
+            return
+
         if urlparse(current_url).netloc != self.base_domain:
             return
 
@@ -135,13 +149,21 @@ class AsyncCrawler:
             tasks = []
 
             for next_url in data["outgoing_links"]:
+                if self.should_stop:
+                    break
+
                 task = asyncio.create_task(
                     self.crawl_page(next_url)
                 )
+                self.all_tasks.add(task)
                 tasks.append(task)
 
             if tasks:
-                await asyncio.gather(*tasks)
+                try:
+                    await asyncio.gather(*tasks)
+                finally:
+                    for task in tasks:
+                        self.all_tasks.discard(task)
 
         except Exception as e:
             print(f"error crawling {current_url}: {e}")
@@ -150,6 +172,10 @@ class AsyncCrawler:
         await self.crawl_page(self.base_url)
         return self.page_data
 
-async def crawl_site_async(base_url):
-    async with AsyncCrawler(base_url, max_concurrency=10) as crawler:
+async def crawl_site_async(base_url, max_concurrency, max_pages):
+    async with AsyncCrawler(
+        base_url,
+        max_concurrency=max_concurrency,
+        max_pages=max_pages,
+    ) as crawler:
         return await crawler.crawl()
