@@ -2,6 +2,7 @@ import asyncio
 import sys
 
 from crawl import crawl_site_async
+from json_report import write_json_report
 
 
 async def main():
@@ -16,11 +17,10 @@ async def main():
     base_url = sys.argv[1]
 
     max_concurrency = 1
-    max_pages = 100
-
     if len(sys.argv) >= 3:
         max_concurrency = int(sys.argv[2])
 
+    max_pages = 100
     if len(sys.argv) >= 4:
         max_pages = int(sys.argv[3])
 
@@ -34,8 +34,7 @@ async def main():
 
     print(f"found {len(page_data)} pages")
 
-    for data in page_data.values():
-        print(data)
+    write_json_report(page_data)
 
 
 if __name__ == "__main__":
